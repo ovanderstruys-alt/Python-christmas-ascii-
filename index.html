@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tinsel Terminal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a shelf of script cards on the left, a sticky terminal on the right where the chosen script runs. Stacks to one column on phones. */
+:root {
+  --night: #0c1613;        /* page ground: pine at midnight */
+  --night-2: #13211c;      /* raised surfaces: cards, title bar */
+  --screen: #060c0a;       /* terminal glass */
+  --line: #24372f;         /* hairlines and borders */
+  --snow: #ece6d8;         /* primary text */
+  --frost: #93a99d;        /* secondary text */
+  --cranberry: #e0473b;    /* accent: running state, primary action */
+  --gold: #f0c04f;         /* filenames, highlights */
+
+  /* terminal palette for ANSI colours used by the scripts */
+  --ansi-red: #c8463a;     --ansi-bred: #ff6b5e;
+  --ansi-green: #3f9a5a;   --ansi-bgreen: #7ee08f;
+  --ansi-yellow: #c99a2e;  --ansi-byellow: #ffd866;
+  --ansi-blue: #4a7cc9;    --ansi-bblue: #7fb2ff;
+  --ansi-magenta: #b05fb8; --ansi-bmagenta: #f08cff;
+  --ansi-cyan: #3fa8a8;    --ansi-bcyan: #85e6e6;
+  --ansi-white: #c9c4b8;   --ansi-bwhite: #ffffff;
+
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--night); }
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--snow);
+  font: 400 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; }
+
+/* ---------- header ---------- */
+header.top {
+  padding-block: 40px 28px;
+  display: grid;
+  gap: 10px;
+}
+.eyebrow {
+  font: 600 12px/1 var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--frost);
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+}
+.eyebrow b { color: var(--gold); font-weight: 600; }
+h1 {
+  margin: 0;
+  font: 700 clamp(40px, 7vw, 76px)/.95 var(--font-display);
+  letter-spacing: -.02em;
+  text-wrap: balance;
+}
+h1 .tinsel {
+  background: repeating-linear-gradient(115deg, var(--gold) 0 10px, #fff1bf 10px 14px, var(--gold) 14px 26px);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+.lede { margin: 4px 0 0; max-width: 60ch; color: var(--frost); font-size: 17px; }
+.lede code { font-family: var(--font-mono); font-size: .9em; color: var(--snow); }
+
+/* ---------- main layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .stage { order: -1; }
+}
+
+.shelf-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font: 600 12px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--frost);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.shelf { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.card {
+  width: 100%;
+  text-align: left;
+  font: inherit; color: inherit;
+  background: var(--night-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px 16px 14px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.card:hover { border-color: #3b574b; transform: translateY(-1px); }
+.card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.card[aria-current="true"] { border-color: var(--cranberry); background: #1d1a16; }
+.card .file { font: 600 13px/1.3 var(--font-mono); color: var(--gold); }
+.card .title { grid-column: 1 / -1; font: 700 20px/1.2 var(--font-display); }
+.card .blurb { grid-column: 1 / -1; color: var(--frost); font-size: 14px; }
+.card .meta { grid-column: 1 / -1; font: 400 12px/1 var(--font-mono); color: var(--frost); opacity: .8; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.chip {
+  font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  padding: 5px 7px; border-radius: 3px;
+  border: 1px solid var(--line); color: var(--frost);
+  white-space: nowrap; align-self: start;
+}
+.card[aria-current="true"] .chip { border-color: var(--cranberry); color: var(--snow); background: var(--cranberry); }
+
+/* ---------- terminal ---------- */
+.stage { position: sticky; top: calc(16px + env(safe-area-inset-top, 0px)); min-width: 0; }
+@media (max-width: 860px) { .stage { position: static; } }
+.term {
+  background: var(--screen);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px -30px #000, 0 0 0 6px #0f1b17;
+}
+.bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--night-2);
+  border-bottom: 1px solid var(--line);
+}
+.prompt {
+  flex: 1 1 220px; min-width: 0;
+  font: 400 13px/1.3 var(--font-mono); color: var(--frost);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.prompt .cmd { color: var(--snow); }
+.prompt .cmd b { color: var(--gold); font-weight: 600; }
+.status {
+  font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 6px; color: var(--frost);
+}
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--frost); }
+.status[data-state="running"] { color: var(--snow); }
+.status[data-state="running"]::before { background: var(--cranberry); box-shadow: 0 0 8px var(--cranberry); animation: blink 1.2s steps(2) infinite; }
+.status[data-state="error"]::before { background: var(--ansi-bred); }
+@keyframes blink { 50% { opacity: .25; } }
+
+.controls { display: flex; gap: 6px; }
+.btn {
+  font: 600 12px/1 var(--font-mono);
+  color: var(--snow);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--frost); }
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.btn[aria-pressed="true"] { background: var(--snow); color: var(--screen); border-color: var(--snow); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+.screen {
+  container-type: inline-size;
+  padding: 18px 16px;
+  min-height: 0;
+}
+.screen pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  /* the widest art is about 56 columns; scale the text so it always fits */
+  font-size: min(15px, calc(100cqi / 34.5));
+  line-height: 1.18;
+  color: var(--ansi-white);
+  min-height: calc(23 * 1.18em);
+  white-space: pre;
+  overflow: hidden;
+}
+.screen .source {
+  font-size: 12.5px; line-height: 1.5;
+  max-height: calc(23 * 1.18 * min(15px, calc(100cqi / 34.5)) + 4px);
+  min-height: calc(23 * 1.18 * min(15px, calc(100cqi / 34.5)));
+  overflow: auto;
+  color: var(--snow);
+  white-space: pre;
+}
+.source .kw { color: var(--ansi-bred); }
+.source .str { color: var(--ansi-bgreen); }
+.source .com { color: var(--frost); font-style: italic; }
+.source .num { color: var(--ansi-byellow); }
+.source .fn { color: var(--gold); }
+
+.notice { color: var(--frost); white-space: pre-wrap; }
+.notice strong { color: var(--snow); font-weight: 600; }
+.error { color: var(--ansi-bred); white-space: pre-wrap; font-size: 12.5px; }
+
+/* ANSI colour classes produced from the scripts' escape codes */
+.a1 { font-weight: 600; }
+.a2 { opacity: .55; }
+.a31 { color: var(--ansi-red); }     .a91 { color: var(--ansi-bred); }
+.a32 { color: var(--ansi-green); }   .a92 { color: var(--ansi-bgreen); }
+.a33 { color: var(--ansi-yellow); }  .a93 { color: var(--ansi-byellow); }
+.a34 { color: var(--ansi-blue); }    .a94 { color: var(--ansi-bblue); }
+.a35 { color: var(--ansi-magenta); } .a95 { color: var(--ansi-bmagenta); }
+.a36 { color: var(--ansi-cyan); }    .a96 { color: var(--ansi-bcyan); }
+.a37 { color: var(--ansi-white); }   .a97 { color: var(--ansi-bwhite); }
+
+.home {
+  margin-top: 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  font-size: 14px; color: var(--frost);
+}
+.home code {
+  font: 400 13px/1 var(--font-mono); color: var(--snow);
+  background: var(--night-2); border: 1px solid var(--line);
+  padding: 8px 10px; border-radius: 4px;
+  overflow-x: auto; max-width: 100%;
+  white-space: nowrap;
+}
+
+/* ---------- add your own ---------- */
+.add {
+  margin-top: 56px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 20px 40px;
+}
+@media (max-width: 860px) { .add { grid-template-columns: minmax(0, 1fr); } }
+.add h2 { margin: 0; font: 700 28px/1.1 var(--font-display); text-wrap: balance; }
+.add ol { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; color: var(--frost); max-width: 65ch; }
+.add ol strong { color: var(--snow); font-weight: 500; }
+.add code { font-family: var(--font-mono); font-size: .88em; color: var(--gold); }
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .card:hover { transition: none; transform: none; }
+  .status[data-state="running"]::before { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow"><span><b>scripts/</b></span><span id="count">5 programs</span><span>Python 3 · runs in your browser</span></div>
+  <h1>Tinsel <span class="tinsel">Terminal</span></h1>
+  <p class="lede">A shelf of small Python programs that draw Christmas out of plain text. Pick one and it runs right here, or copy the command and run it in your own terminal.</p>
+</header>
+
+<main class="layout">
+  <section aria-labelledby="shelf-label">
+    <div class="shelf-head"><span id="shelf-label">The library</span><span>click to run</span></div>
+    <ul class="shelf" id="shelf"></ul>
+  </section>
+
+  <section class="stage" aria-label="Terminal">
+    <div class="term">
+      <div class="bar">
+        <div class="prompt" id="prompt">~/christmas $ <span class="cmd">python <b>…</b></span></div>
+        <span class="status" id="status" data-state="loading">loading</span>
+        <div class="controls">
+          <button class="btn" id="pauseBtn" type="button" disabled>Pause</button>
+          <button class="btn" id="restartBtn" type="button" disabled>Restart</button>
+          <button class="btn" id="sourceBtn" type="button" aria-pressed="false" disabled>Source</button>
+        </div>
+      </div>
+      <div class="screen">
+        <pre id="out" aria-live="off"><span class="notice">Starting Python in your browser…
+<strong>This takes a few seconds the first time.</strong></span></pre>
+        <pre id="src" class="source" hidden></pre>
+      </div>
+    </div>
+    <div class="home">
+      <span>Run it at home:</span>
+      <code id="homeCmd">python scripts/tree.py</code>
+      <button class="btn" id="copyBtn" type="button">Copy</button>
+    </div>
+  </section>
+</main>
+
+<section class="add" aria-labelledby="add-title">
+  <h2 id="add-title">Add your own script</h2>
+  <ol>
+    <li><strong>Write a file in <code>scripts/</code></strong> with a <code>TITLE</code>, a one-line <code>BLURB</code>, an <code>FPS</code> and a <code>frames()</code> generator that yields one picture at a time as a string.</li>
+    <li><strong>Colour it with ANSI codes</strong> like <code>\033[91m</code> for red. They work in a real terminal and on this page.</li>
+    <li><strong>Add the filename to <code>scripts/library.json</code></strong>. The page reads that list, so the new script shows up on the shelf straight away.</li>
+  </ol>
+</section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython_stdlib.js"></script>
+
+<script>
+/* ---------- page side: library, rendering, controls ---------- */
+const $ = (id) => document.getElementById(id);
+const els = {
+  shelf: $("shelf"), out: $("out"), src: $("src"), prompt: $("prompt"), status: $("status"),
+  pause: $("pauseBtn"), restart: $("restartBtn"), source: $("sourceBtn"),
+  homeCmd: $("homeCmd"), copy: $("copyBtn"), count: $("count"),
+};
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const lib = { scripts: [], current: null, paused: false, pyReady: false, queued: null, firstRun: true };
+
+const escapeHtml = (t) => t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+/* Turn ANSI colour escapes (\x1b[...m) into spans with classes like a91 */
+function ansiToHtml(text) {
+  const re = /\x1b\[([0-9;]*)([A-Za-z])/g;
+  let html = "", last = 0, open = false, m;
+  while ((m = re.exec(text))) {
+    html += escapeHtml(text.slice(last, m.index));
+    last = re.lastIndex;
+    if (m[2] !== "m") continue;           // ignore cursor moves etc.
+    if (open) { html += "</span>"; open = false; }
+    const codes = m[1].split(";").filter((c) => c && c !== "0");
+    if (codes.length) { html += '<span class="' + codes.map((c) => "a" + c).join(" ") + '">'; open = true; }
+  }
+  html += escapeHtml(text.slice(last));
+  if (open) html += "</span>";
+  return html;
+}
+
+/* A small Python highlighter for the Source view */
+function highlightPython(code) {
+  const re = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|#[^\n]*|\b(?:def|return|yield|import|from|as|if|elif|else|for|while|in|not|and|or|try|except|finally|with|class|lambda|None|True|False|pass|break|continue)\b|\b\d+(?:\.\d+)?\b|\b[A-Za-z_]\w*(?=\())/g;
+  let html = "", last = 0, m;
+  while ((m = re.exec(code))) {
+    html += escapeHtml(code.slice(last, m.index));
+    const tok = m[0];
+    let cls = "fn";
+    if (tok[0] === "#") cls = "com";
+    else if (tok[0] === '"' || tok[0] === "'") cls = "str";
+    else if (/^\d/.test(tok)) cls = "num";
+    else if (/^(def|return|yield|import|from|as|if|elif|else|for|while|in|not|and|or|try|except|finally|with|class|lambda|None|True|False|pass|break|continue)$/.test(tok)) cls = "kw";
+    html += '<span class="' + cls + '">' + escapeHtml(tok) + "</span>";
+    last = re.lastIndex;
+  }
+  return html + escapeHtml(code.slice(last));
+}
+
+function readConstant(src, name) {
+  const m = src.match(new RegExp("^" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([0-9.]+))", "m"));
+  return m ? (m[1] ?? m[2] ?? m[3]) : null;
+}
+
+function setStatus(state, label) {
+  els.status.dataset.state = state;
+  els.status.textContent = label;
+}
+
+function showNotice(html, cls = "notice") {
+  els.out.innerHTML = '<span class="' + cls + '">' + html + "</span>";
+}
+
+function renderShelf() {
+  els.shelf.innerHTML = "";
+  els.count.textContent = lib.scripts.length + " programs";
+  for (const s of lib.scripts) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "card";
+    btn.id = "card-" + s.file.replace(/\W/g, "-");
+    btn.setAttribute("aria-current", "false");
+    btn.innerHTML =
+      '<span class="file"></span><span class="chip">run</span>' +
+      '<span class="title"></span><span class="blurb"></span><span class="meta"></span>';
+    btn.querySelector(".file").textContent = s.file;
+    btn.querySelector(".title").textContent = s.title;
+    btn.querySelector(".blurb").textContent = s.blurb;
+    btn.querySelector(".meta").textContent = s.lines + " lines · " + s.fps + " fps";
+    btn.addEventListener("click", () => {
+      run(s);
+      if (window.matchMedia("(max-width: 860px)").matches) {
+        document.querySelector(".stage").scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+      }
+    });
+    s.button = btn;
+    li.appendChild(btn);
+    els.shelf.appendChild(li);
+  }
+}
+
+function markCurrent(s) {
+  for (const other of lib.scripts) {
+    const on = other === s;
+    other.button.setAttribute("aria-current", on ? "true" : "false");
+    other.button.querySelector(".chip").textContent = on ? "running" : "run";
+  }
+}
+
+function run(s) {
+  lib.current = s;
+  lib.paused = false;
+  markCurrent(s);
+  els.prompt.innerHTML = '~/christmas $ <span class="cmd">python <b></b></span>';
+  els.prompt.querySelector("b").textContent = s.file;
+  els.homeCmd.textContent = "python scripts/" + s.file;
+  els.src.innerHTML = highlightPython(s.source);
+  els.pause.textContent = "Pause";
+  [els.pause, els.restart, els.source].forEach((b) => (b.disabled = false));
+  if (!lib.pyReady) { lib.queued = s; return; }
+  setStatus("running", "running · " + s.fps + " fps");
+  window.tinselPyRun(s.source, s.file);
+  lib.queued = null;
+  // With reduced motion, show the first script's opening frame but don't animate until asked
+  if (reducedMotion && lib.firstRun) pause();
+  lib.firstRun = false;
+}
+
+function pause() {
+  if (!lib.current || !lib.pyReady) return;
+  lib.paused = true;
+  window.tinselPyPause();
+  els.pause.textContent = "Play";
+  setStatus("paused", "paused");
+}
+
+function resume() {
+  lib.paused = false;
+  window.tinselPyResume();
+  els.pause.textContent = "Pause";
+  setStatus("running", "running · " + lib.current.fps + " fps");
+}
+
+/* Called from Python */
+window.tinsel = {
+  frame(text) { els.out.innerHTML = ansiToHtml(text); },
+  finished() { setStatus("done", "finished"); els.pause.disabled = true; },
+  failed(message) {
+    setStatus("error", "error");
+    showNotice(escapeHtml(message), "error");
+  },
+  ready() {
+    lib.pyReady = true;
+    if (lib.queued) run(lib.queued);
+  },
+};
+
+els.pause.addEventListener("click", () => (lib.paused ? resume() : pause()));
+els.restart.addEventListener("click", () => lib.current && run(lib.current));
+els.source.addEventListener("click", () => {
+  const showing = els.source.getAttribute("aria-pressed") === "true";
+  els.source.setAttribute("aria-pressed", String(!showing));
+  els.src.hidden = showing;
+  els.out.hidden = !showing;
+});
+els.copy.addEventListener("click", async () => {
+  const text = els.homeCmd.textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    els.copy.textContent = "Copied";
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(els.homeCmd);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    els.copy.textContent = "Selected";
+  }
+  setTimeout(() => (els.copy.textContent = "Copy"), 1600);
+});
+
+/* Load the library list and each script's source */
+async function loadLibrary() {
+  try {
+    const files = await (await fetch("scripts/library.json")).json();
+    lib.scripts = await Promise.all(files.map(async (file) => {
+      const res = await fetch("scripts/" + file);
+      if (!res.ok) throw new Error("Could not load scripts/" + file);
+      const source = await res.text();
+      return {
+        file, source,
+        title: readConstant(source, "TITLE") || file,
+        blurb: readConstant(source, "BLURB") || "",
+        fps: Number(readConstant(source, "FPS")) || 8,
+        lines: source.trimEnd().split("\n").length,
+      };
+    }));
+    renderShelf();
+    run(lib.scripts[0]);
+    if (!lib.pyReady) setStatus("loading", "starting python");
+  } catch (err) {
+    setStatus("error", "can't load");
+    showNotice(
+      "<strong>The scripts couldn't be loaded.</strong>\n\n" +
+      "Browsers block pages opened straight from disk from reading other files.\n" +
+      "Start a tiny local server in this folder instead:\n\n" +
+      "    python -m http.server 8000\n\n" +
+      "then open http://localhost:8000"
+    );
+  }
+}
+loadLibrary();
+
+/* If Python never starts (offline, or the CDN is blocked), say so instead of spinning forever */
+setTimeout(() => {
+  if (lib.pyReady || els.status.dataset.state === "error") return;
+  setStatus("error", "no python");
+  showNotice(
+    "<strong>Python didn't start in this browser.</strong>\n\n" +
+    "The page loads Brython (Python for the browser) from cdn.jsdelivr.net.\n" +
+    "Check your connection, or run any script in a terminal:\n\n" +
+    "    " + escapeHtml(els.homeCmd.textContent)
+  );
+}, 25000);
+</script>
+
+<script type="text/python">
+# ---------- Python side: runs a script's frames() generator on a timer ----------
+import traceback
+from browser import window, timer
+
+state = {"gen": None, "handle": None, "fps": 8}
+
+
+def cancel():
+    if state["handle"] is not None:
+        timer.clear_timeout(state["handle"])
+        state["handle"] = None
+
+
+def step():
+    state["handle"] = None
+    try:
+        frame = next(state["gen"])
+    except StopIteration:
+        window.tinsel.finished()
+        return
+    except Exception:
+        window.tinsel.failed(traceback.format_exc())
+        return
+    window.tinsel.frame(frame)
+    state["handle"] = timer.set_timeout(step, 1000 / state["fps"])
+
+
+def run(source, filename):
+    cancel()
+    namespace = {"__name__": "tinsel_terminal", "__file__": filename}
+    try:
+        exec(source, namespace)
+        state["gen"] = namespace["frames"]()
+        state["fps"] = namespace.get("FPS", 8)
+    except Exception:
+        window.tinsel.failed(traceback.format_exc())
+        return
+    step()
+
+
+def pause():
+    cancel()
+
+
+def resume():
+    if state["gen"] is not None and state["handle"] is None:
+        step()
+
+
+window.tinselPyRun = run
+window.tinselPyPause = pause
+window.tinselPyResume = resume
+window.tinsel.ready()
+</script>
+</body>
+</html>
