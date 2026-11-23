@@ -15,21 +15,31 @@ def paint(code, text):
     return "\033[" + code + "m" + text + RESET
 
 
-# Each digit is 5 rows tall, drawn with "#" and turned into solid blocks when printed.
-DIGITS = {
-    "0": ["###", "# #", "# #", "# #", "###"],
-    "1": [" # ", "## ", " # ", " # ", "###"],
-    "2": ["###", "  #", "###", "#  ", "###"],
-    "3": ["###", "  #", " ##", "  #", "###"],
-    "4": ["# #", "# #", "###", "  #", "  #"],
-    "5": ["###", "#  ", "###", "  #", "###"],
-    "6": ["###", "#  ", "###", "# #", "###"],
-    "7": ["###", "  #", " # ", " # ", " # "],
-    "8": ["###", "# #", "###", "# #", "###"],
-    "9": ["###", "# #", "###", "  #", "###"],
-    ":": [" ", "#", " ", "#", " "],
-    " ": [" ", " ", " ", " ", " "],
+# Seven-segment digits, like a digital clock: 5 columns wide and 5 rows tall.
+#   a = top bar, b/c = right side (upper/lower), d = bottom bar,
+#   e/f = left side (lower/upper), g = middle bar
+SEGMENTS = {
+    "0": "abcdef", "1": "bc", "2": "abdeg", "3": "abcdg", "4": "bcfg",
+    "5": "acdfg", "6": "acdefg", "7": "abc", "8": "abcdefg", "9": "abcdfg",
 }
+
+
+def glyph(ch):
+    if ch == ":":
+        return [" ", "\u2022", " ", "\u2022", " "]
+    on = SEGMENTS[ch]
+    bar = " \u2501\u2501\u2501 "
+    gap = "     "
+    def sides(left, right):
+        return ("\u2503" if left in on else " ") + "   " + ("\u2503" if right in on else " ")
+    return [
+        bar if "a" in on else gap,
+        sides("f", "b"),
+        bar if "g" in on else gap,
+        sides("e", "c"),
+        bar if "d" in on else gap,
+    ]
+
 
 WIDTH = 54
 
@@ -39,10 +49,10 @@ def big(text, colour, blink_colon=False):
     for r in range(5):
         row = ""
         for ch in text:
-            glyph = DIGITS[ch][r]
+            part = glyph(ch)[r]
             if ch == ":" and blink_colon:
-                glyph = " "
-            row += glyph.replace("#", "██").replace(" ", "  ") + "  "
+                part = " "
+            row += part + "  "
         rows.append(row.rstrip())
     width = max(len(r) for r in rows)
     pad = " " * max(0, (WIDTH - width) // 2)
@@ -83,11 +93,11 @@ def frames():
             left = target - now
             hours, rest = divmod(left.seconds, 3600)
             minutes, seconds = divmod(rest, 60)
-            lines += big(str(left.days), "91;1")
+            lines += big(str(left.days), "91")
             lines.append(centre("days" if left.days != 1 else "day", "97"))
             lines.append("")
-            lines += big("%02d:%02d:%02d" % (hours, minutes, seconds), "92;1", blink_colon=t % 2 == 1)
-            labels = "hours".center(14) + " " * 6 + "minutes".center(14) + " " * 6 + "seconds".center(14)
+            lines += big("%02d:%02d:%02d" % (hours, minutes, seconds), "92", blink_colon=t % 2 == 1)
+            labels = "hours".center(12) + " " * 5 + "minutes".center(12) + " " * 5 + "seconds".center(12)
             lines.append(centre(labels, "97"))
         lines.append("")
         lines += candles(t)
